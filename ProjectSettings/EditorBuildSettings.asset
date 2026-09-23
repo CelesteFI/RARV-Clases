@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Practica 1/Scenes/FlorAR.unity
-    guid: da0ca757e19bc084f88c23383035665f
+    path: Assets/Practica 2/Scenes/FlorAR - Modificacion.unity
+    guid: 82c45dd0c5119a64aa190f341772e6e2
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
