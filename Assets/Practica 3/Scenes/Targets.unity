@@ -395,10 +395,8 @@ MonoBehaviour:
   - {fileID: 643445577}
   indiceActual: 0
   velocidad: 0.3
-  modelosDestino:
-  - {fileID: 692867164}
-  - {fileID: 237747275}
-  - {fileID: 1105109903}
+  modeloPerro: {fileID: 237747275}
+  modeloFlor: {fileID: 1105109903}
 --- !u!114 &342931526
 MonoBehaviour:
   m_ObjectHideFlags: 0
