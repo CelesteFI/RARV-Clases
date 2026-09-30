@@ -8,8 +8,17 @@ public class MoverObjeto : MonoBehaviour
     public GameObject modelo;
     public ObserverBehaviour[] marcadores;
     public int indiceActual = 0;
-    public float velocidad = 1.0f;
+    public float velocidad = 0.3f;
     private bool seEstaMoviendo = false;
+    private Animator animator;
+
+    void Start()
+    {
+        if (modelo != null)
+        {
+            animator = modelo.GetComponentInChildren<Animator>();
+        }
+    }
 
     public void MoverAlSiguienteMarcador()
     {
@@ -30,6 +39,12 @@ public class MoverObjeto : MonoBehaviour
             yield break;
         }
 
+        // Enciende la animación
+        if (animator != null)
+        {
+            animator.SetBool("active", true);
+        }
+
         Vector3 posicionInicial = modelo.transform.position;
         Vector3 posicionFinal = objetivo.transform.position;
 
@@ -42,6 +57,14 @@ public class MoverObjeto : MonoBehaviour
         }
 
         modelo.transform.position = posicionFinal;
+
+        // Apaga la animación al aterrizar
+        if (animator != null)
+        {
+            animator.SetBool("active", false);
+        }
+
+
         seEstaMoviendo = false;
     }
 
