@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Practica 3/Scenes/MultipleTargets.unity
-    guid: e99d30405bbed914eb8966c1c483b7d6
+    path: Assets/Practica 3/Scenes/Targets 1.unity
+    guid: 6439ec6e494b14c4baa6442c1d7d0511
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
