@@ -19,25 +19,21 @@ public class GameStoryManager : MonoBehaviour
 
     [Header("Protagonista")]
     public GameObject pajaro;
-    public ObserverBehaviour marcadorPajaroBase; // Marcador 0 (Nido)
+    public ObserverBehaviour marcadorPajaroBase; // ImageTarget (4)
     public float velocidadVuelo = 0.8f;
-    public float alturaArcoVuelo = 0.12f; // Altura del arco ajustada a escala de mesa
-
-    [Header("Distancias de Aterrizaje (Escala Real Vuforia en Metros)")]
-    // Tarjeta física: 8 cm (0.08 m de ancho total, radio de 0.04 m desde el centro)
-    public float distanciaManzana = 0.015f; // 1.5 cm del centro (frente a la manzana)
-    public float distanciaGema = 0.020f;    // 2.0 cm del centro (frente a la gema)
-    public float distanciaTigre = 0.035f;   // 3.5 cm del centro (frente a las garras del tigre)
-    public float distanciaIsla = 0.045f;    // 4.5 cm del centro (en el borde exterior del santuario)
+    public float alturaArcoVuelo = 0.14f;
 
     [Header("Marcadores Secundarios (4)")]
-    public ObserverBehaviour[] marcadoresSecundarios; // Marcadores 1 al 4
+    public ObserverBehaviour[] marcadoresSecundarios; // ImageTarget (0) al (3)
 
-    [Header("Modelos Secundarios / Contenedores (4)")]
-    public GameObject modeloManzana; // Contenedor_Apple
-    public GameObject modeloTigre;   // Contenedor_Tigre
-    public GameObject modeloGema;    // altar completo
-    public GameObject modeloIsla;    // island
+    [Header("Signos de Interrogación por Marcador (4)")]
+    public GameObject[] questionsMarcadores; // Question_0 al Question_3 hijos de los targets
+
+    [Header("Contenedores de Escena (4)")]
+    public GameObject escenaManzana; // Escena_Manzana
+    public GameObject escenaTigre;   // Escena_Tigre
+    public GameObject escenaGema;    // Escena_Altar
+    public GameObject escenaIsla;    // Escena_Isla
 
     private int pasoHistoria = 0;
     private bool seEstaMoviendo = false;
@@ -46,6 +42,7 @@ public class GameStoryManager : MonoBehaviour
 
     private ObserverBehaviour marcadorActualPajaro;
     private Dictionary<ObserverBehaviour, TipoElemento> asignacionMarcadores = new Dictionary<ObserverBehaviour, TipoElemento>();
+    private HashSet<ObserverBehaviour> targetsRevelados = new HashSet<ObserverBehaviour>();
 
     void Start()
     {
@@ -68,32 +65,50 @@ public class GameStoryManager : MonoBehaviour
         seEstaMoviendo = false;
         pasoHistoria = 0;
         historiaIniciada = false;
+        targetsRevelados.Clear();
 
-        // 1. Regresar pájaro a su base e inicializarlo apagado
+        // 1. Restaurar posición inicial del pájaro en el nido
         if (marcadorPajaroBase != null && pajaro != null)
         {
             marcadorActualPajaro = marcadorPajaroBase;
-            pajaro.transform.SetParent(marcadorPajaroBase.transform, false);
-            pajaro.transform.localPosition = Vector3.zero;
-            pajaro.transform.localRotation = Quaternion.identity;
+            Transform puntoInicial = marcadorPajaroBase.transform.Find("Escena_Pajaro/Base/Punto Pajaro");
+            if (puntoInicial == null) puntoInicial = marcadorPajaroBase.transform.Find("Base/Punto Pajaro");
 
-            // Permanece oculto hasta que la cámara enfoque la carta nido
+            pajaro.transform.SetParent(marcadorPajaroBase.transform, false);
+
+            if (puntoInicial != null)
+            {
+                pajaro.transform.localPosition = puntoInicial.localPosition;
+                pajaro.transform.localRotation = puntoInicial.localRotation;
+            }
+            else
+            {
+                pajaro.transform.localPosition = Vector3.zero;
+                pajaro.transform.localRotation = Quaternion.identity;
+            }
+
             pajaro.SetActive(false);
         }
 
-        // 2. Barajar los modelos secundarios
+        // 2. Barajar los dioramas entre los marcadores secundarios
         BarajarModelos();
 
-        // 3. Restaurar modelos secundarios
-        if (modeloManzana != null) modeloManzana.SetActive(false);
-        if (modeloTigre != null) modeloTigre.SetActive(false);
-        if (modeloIsla != null) modeloIsla.SetActive(false);
+        // 3. Ocultar escenas y reactivar los signos de interrogación
+        if (escenaManzana != null) escenaManzana.SetActive(false);
+        if (escenaTigre != null) escenaTigre.SetActive(false);
+        if (escenaIsla != null) escenaIsla.SetActive(false);
 
-        if (modeloGema != null)
+        if (escenaGema != null)
         {
-            modeloGema.SetActive(false);
-            Transform cristal = modeloGema.transform.Find("Gema");
+            escenaGema.SetActive(false);
+            Transform cristal = escenaGema.transform.Find("altar completo/Gema");
+            if (cristal == null) cristal = escenaGema.transform.Find("Gema");
             if (cristal != null) cristal.gameObject.SetActive(true);
+        }
+
+        foreach (var q in questionsMarcadores)
+        {
+            if (q != null) q.SetActive(true);
         }
 
         ActualizarTextoMision();
@@ -126,12 +141,12 @@ public class GameStoryManager : MonoBehaviour
             TipoElemento tipo = elementos[i];
             asignacionMarcadores[marcador] = tipo;
 
-            GameObject modeloAsignado = ObtenerGameObjectPorTipo(tipo);
-            if (modeloAsignado != null && marcador != null)
+            GameObject escenaAsignada = ObtenerGameObjectPorTipo(tipo);
+            if (escenaAsignada != null && marcador != null)
             {
-                modeloAsignado.transform.SetParent(marcador.transform, false);
-                modeloAsignado.transform.localPosition = Vector3.zero;
-                modeloAsignado.transform.localRotation = Quaternion.identity;
+                escenaAsignada.transform.SetParent(marcador.transform, false);
+                escenaAsignada.transform.localPosition = Vector3.zero;
+                escenaAsignada.transform.localRotation = Quaternion.identity;
             }
         }
     }
@@ -140,10 +155,10 @@ public class GameStoryManager : MonoBehaviour
     {
         switch (tipo)
         {
-            case TipoElemento.Manzana: return modeloManzana;
-            case TipoElemento.Tigre: return modeloTigre;
-            case TipoElemento.Gema: return modeloGema;
-            case TipoElemento.Isla: return modeloIsla;
+            case TipoElemento.Manzana: return escenaManzana;
+            case TipoElemento.Tigre: return escenaTigre;
+            case TipoElemento.Gema: return escenaGema;
+            case TipoElemento.Isla: return escenaIsla;
             default: return null;
         }
     }
@@ -152,50 +167,82 @@ public class GameStoryManager : MonoBehaviour
     {
         if (seEstaMoviendo) return;
 
-        // Visibilidad del pájaro
+        // Control del ave protagonista
         if (pajaro != null && marcadorActualPajaro != null)
         {
             bool targetVisible = EsTargetVisible(marcadorActualPajaro);
-
             if (!historiaIniciada)
             {
-                // Solo se ve al inicio si la carta nido está enfocada
                 if (pajaro.activeSelf != targetVisible)
-                {
                     pajaro.SetActive(targetVisible);
+            }
+            else
+            {
+                if (!pajaro.activeSelf)
+                    pajaro.SetActive(true);
+            }
+        }
+
+        // Control de visibilidad en marcadores secundarios
+        for (int i = 0; i < marcadoresSecundarios.Length; i++)
+        {
+            ObserverBehaviour marcador = marcadoresSecundarios[i];
+            GameObject question = (i < questionsMarcadores.Length) ? questionsMarcadores[i] : null;
+
+            if (marcador == null) continue;
+
+            bool visibleEnCamara = EsTargetVisible(marcador);
+            bool yaFueRevelado = targetsRevelados.Contains(marcador);
+
+            // Al concluir la misión, se ocultan elementos secundarios ajenos a la isla
+            if (pasoHistoria >= 4)
+            {
+                if (question != null) question.SetActive(false);
+
+                if (asignacionMarcadores.ContainsKey(marcador))
+                {
+                    TipoElemento tipo = asignacionMarcadores[marcador];
+                    GameObject escena = ObtenerGameObjectPorTipo(tipo);
+                    if (escena != null)
+                    {
+                        if (tipo == TipoElemento.Isla)
+                            escena.SetActive(visibleEnCamara);
+                        else
+                            escena.SetActive(false);
+                    }
+                }
+                continue;
+            }
+
+            if (!yaFueRevelado)
+            {
+                if (question != null && question.activeSelf != visibleEnCamara)
+                {
+                    question.SetActive(visibleEnCamara);
                 }
             }
             else
             {
-                // Una vez que comienza la travesía permanece activo
-                if (!pajaro.activeSelf)
+                if (question != null && question.activeSelf)
                 {
-                    pajaro.SetActive(true);
-                }
-            }
-        }
-
-        // Visibilidad de los modelos secundarios
-        foreach (var par in asignacionMarcadores)
-        {
-            ObserverBehaviour marcador = par.Key;
-            TipoElemento tipo = par.Value;
-            GameObject go = ObtenerGameObjectPorTipo(tipo);
-
-            if (go != null && marcador != null)
-            {
-                bool targetEnCamara = EsTargetVisible(marcador);
-
-                // Si la manzana ya fue consumida, mantenerla apagada
-                if (tipo == TipoElemento.Manzana && pasoHistoria > 0)
-                {
-                    go.SetActive(false);
-                    continue;
+                    question.SetActive(false);
                 }
 
-                if (go.activeSelf != targetEnCamara)
+                if (asignacionMarcadores.ContainsKey(marcador))
                 {
-                    go.SetActive(targetEnCamara);
+                    TipoElemento tipo = asignacionMarcadores[marcador];
+                    GameObject escena = ObtenerGameObjectPorTipo(tipo);
+                    if (escena != null)
+                    {
+                        if (tipo == TipoElemento.Manzana && pasoHistoria > 0)
+                        {
+                            escena.SetActive(false);
+                        }
+                        else if (escena.activeSelf != visibleEnCamara)
+                        {
+                            escena.SetActive(visibleEnCamara);
+                        }
+                    }
                 }
             }
         }
@@ -210,7 +257,6 @@ public class GameStoryManager : MonoBehaviour
 
     public void PresionarBotonAccion()
     {
-        // Se congela el botón durante el vuelo o tras completar la misión final en la isla
         if (seEstaMoviendo || pasoHistoria >= 4) return;
 
         ObserverBehaviour marcadorDestino = ObtenerMarcadorDestinoValido();
@@ -218,7 +264,7 @@ public class GameStoryManager : MonoBehaviour
         if (marcadorDestino == null)
         {
             if (textoHistoria != null)
-                textoHistoria.text = "Enfoca la carta hacia donde quieres que vuele el pájaro.";
+                textoHistoria.text = "Enfoca la carta misteriosa hacia donde quieres que vuele el pájaro.";
             return;
         }
 
@@ -240,16 +286,23 @@ public class GameStoryManager : MonoBehaviour
         return null;
     }
 
-    private float ObtenerDistanciaFrenado(TipoElemento elemento)
+    private Transform ObtenerPuntoAterrizaje(GameObject escena)
     {
-        switch (elemento)
-        {
-            case TipoElemento.Manzana: return distanciaManzana;
-            case TipoElemento.Gema: return distanciaGema;
-            case TipoElemento.Tigre: return distanciaTigre;
-            case TipoElemento.Isla: return distanciaIsla;
-            default: return 0.02f;
-        }
+        if (escena == null) return null;
+
+        // Búsqueda en el prefab base (rama)
+        Transform punto = escena.transform.Find("Base/Punto Pajaro");
+        if (punto != null) return punto;
+
+        punto = escena.transform.Find("EscenaBase/Punto Pajaro");
+        if (punto != null) return punto;
+
+        // Búsqueda en la jerarquía de la isla
+        punto = escena.transform.Find("island/Punto Pajaro");
+        if (punto != null) return punto;
+
+        punto = escena.transform.Find("Punto Pajaro");
+        return punto;
     }
 
     private IEnumerator ProcesarViajeEInteraccion(ObserverBehaviour destino, TipoElemento elemento)
@@ -265,33 +318,22 @@ public class GameStoryManager : MonoBehaviour
             animatorPajaro.SetBool("active", true);
         }
 
+        GameObject escenaDestino = ObtenerGameObjectPorTipo(elemento);
+        Transform puntoRef = ObtenerPuntoAterrizaje(escenaDestino);
+
         Vector3 posInicial = pajaro.transform.position;
-        Vector3 posCentroDestino = destino.transform.position;
+        Vector3 posFinal = (puntoRef != null) ? puntoRef.position : destino.transform.position;
+        Quaternion rotFinal = (puntoRef != null) ? puntoRef.rotation : destino.transform.rotation;
 
-        // Vector horizontal en el plano de la mesa
-        Vector3 direccion = (posCentroDestino - posInicial);
-        direccion.y = 0;
-
-        float distancia = direccion.magnitude;
-        Vector3 direccionNorm = direccion.normalized;
-
-        // Calcular punto de aterrizaje con margen de seguridad
-        float margenSeguridad = ObtenerDistanciaFrenado(elemento);
-        Vector3 posFinal = posCentroDestino;
-
-        if (distancia > margenSeguridad)
+        // Orientación inicial hacia el destino en el plano horizontal
+        Vector3 dirHorizontal = (posFinal - posInicial);
+        dirHorizontal.y = 0;
+        if (dirHorizontal != Vector3.zero)
         {
-            posFinal = posCentroDestino - (direccionNorm * margenSeguridad);
+            pajaro.transform.rotation = Quaternion.LookRotation(dirHorizontal.normalized);
         }
 
-        posFinal.y = posCentroDestino.y;
-
-        if (direccionNorm != Vector3.zero)
-        {
-            pajaro.transform.rotation = Quaternion.LookRotation(direccionNorm);
-        }
-
-        // Vuelo en arco parabólico
+        // Vuelo parabólico
         float progreso = 0f;
         while (progreso < 1.0f)
         {
@@ -300,12 +342,21 @@ public class GameStoryManager : MonoBehaviour
             posActual.y += Mathf.Sin(progreso * Mathf.PI) * alturaArcoVuelo;
 
             pajaro.transform.position = posActual;
+
+            // Interpolación de rotación final al aproximarse al aterrizaje
+            if (progreso > 0.6f)
+            {
+                float factorGiro = (progreso - 0.6f) / 0.4f;
+                pajaro.transform.rotation = Quaternion.Slerp(pajaro.transform.rotation, rotFinal, factorGiro);
+            }
+
             yield return null;
         }
 
         pajaro.transform.position = posFinal;
+        pajaro.transform.rotation = rotFinal;
 
-        // Emparentar al nuevo marcador conservando su posición física
+        // Emparentar con el marcador destino conservando su posición
         pajaro.transform.SetParent(destino.transform, true);
         marcadorActualPajaro = destino;
 
@@ -314,9 +365,38 @@ public class GameStoryManager : MonoBehaviour
             animatorPajaro.SetBool("active", false);
         }
 
+        // --- REVELACIÓN DEL DIORAMA ---
+        targetsRevelados.Add(destino);
+
+        int indexDestino = System.Array.IndexOf(marcadoresSecundarios, destino);
+        if (indexDestino >= 0 && indexDestino < questionsMarcadores.Length && questionsMarcadores[indexDestino] != null)
+        {
+            questionsMarcadores[indexDestino].SetActive(false);
+        }
+
+        if (escenaDestino != null)
+        {
+            escenaDestino.SetActive(true);
+        }
+
+        EjecutarEfectoEspecial(elemento);
         EvaluarPaso(elemento);
 
         seEstaMoviendo = false;
+    }
+
+    private void EjecutarEfectoEspecial(TipoElemento elemento)
+    {
+        if (elemento == TipoElemento.Tigre && escenaTigre != null)
+        {
+            AnimacionGuardian guardianAnim = escenaTigre.GetComponentInChildren<AnimacionGuardian>();
+            if (guardianAnim != null) guardianAnim.ReaccionarLlegada();
+        }
+        else if (elemento == TipoElemento.Isla && escenaIsla != null)
+        {
+            AnimacionIslaPortal portalAnim = escenaIsla.GetComponentInChildren<AnimacionIslaPortal>();
+            if (portalAnim != null) portalAnim.ActivarDestelloPortal();
+        }
     }
 
     private void EvaluarPaso(TipoElemento elemento)
@@ -326,15 +406,12 @@ public class GameStoryManager : MonoBehaviour
             case 0:
                 if (elemento == TipoElemento.Manzana)
                 {
-                    if (animatorPajaro != null)
-                    {
-                        animatorPajaro.SetTrigger("comer");
-                    }
+                    if (animatorPajaro != null) animatorPajaro.SetTrigger("comer");
                     StartCoroutine(ConsumirManzanaConAnimacion());
                 }
                 else
                 {
-                    textoHistoria.text = "El pájaro está débil de hambre. Necesita la Manzana Dorada primero.";
+                    textoHistoria.text = "¡Descubriste un lugar incorrecto! El pájaro está hambriento y necesita la Manzana primero.";
                 }
                 break;
 
@@ -342,7 +419,7 @@ public class GameStoryManager : MonoBehaviour
                 if (elemento == TipoElemento.Tigre)
                 {
                     pasoHistoria = 2;
-                    textoHistoria.text = "El Guardián dice: 'Has demostrado vigor. Encuentra la Gema Astral para encender el santuario'.";
+                    textoHistoria.text = "El Guardián dice: 'Has demostrado vigor. Encuentra la Gema Astral para activar el santuario'.";
                 }
                 else
                 {
@@ -353,9 +430,9 @@ public class GameStoryManager : MonoBehaviour
             case 2:
                 if (elemento == TipoElemento.Gema)
                 {
-                    Transform cristal = modeloGema.transform.Find("Gema");
+                    Transform cristal = escenaGema.transform.Find("altar completo/Gema");
+                    if (cristal == null) cristal = escenaGema.transform.Find("Gema");
                     if (cristal != null) cristal.gameObject.SetActive(false);
-                    else modeloGema.SetActive(false);
 
                     pasoHistoria = 3;
                     textoHistoria.text = "¡Obtuviste la Gema Astral! Vuela a la Isla Flotante para abrir el portal final.";
@@ -370,12 +447,18 @@ public class GameStoryManager : MonoBehaviour
                 if (elemento == TipoElemento.Isla)
                 {
                     pasoHistoria = 4;
-                    textoHistoria.text = "¡Misión cumplida! El portal de la Isla Flotante ha sido activado.";
-                }
-                break;
+                    textoHistoria.text = "¡FELICIDADES! Has completado la travesía astral y activado el portal sagrado.";
 
-            case 4:
-                textoHistoria.text = "Aventura completada. Presiona 'Reinicio' para barajar los marcadores.";
+                    // Desactivar las demás escenas para limpiar la escena final
+                    if (escenaManzana != null) escenaManzana.SetActive(false);
+                    if (escenaTigre != null) escenaTigre.SetActive(false);
+                    if (escenaGema != null) escenaGema.SetActive(false);
+
+                    foreach (var q in questionsMarcadores)
+                    {
+                        if (q != null) q.SetActive(false);
+                    }
+                }
                 break;
         }
     }
@@ -383,7 +466,7 @@ public class GameStoryManager : MonoBehaviour
     private IEnumerator ConsumirManzanaConAnimacion()
     {
         yield return new WaitForSeconds(1.2f);
-        if (modeloManzana != null) modeloManzana.SetActive(false);
+        if (escenaManzana != null) escenaManzana.SetActive(false);
         pasoHistoria = 1;
         textoHistoria.text = "¡El pájaro comió la Manzana Dorada y recuperó su energía! Ahora busca al Tigre Guardián.";
     }
@@ -395,16 +478,19 @@ public class GameStoryManager : MonoBehaviour
         switch (pasoHistoria)
         {
             case 0:
-                textoHistoria.text = "Capítulo 1: El mensajero ha despertado débil. Encuentra la Manzana Dorada.";
+                textoHistoria.text = "Capítulo 1: Explora las cartas misteriosas para encontrar la Manzana Dorada.";
                 break;
             case 1:
-                textoHistoria.text = "Capítulo 2: Con energía renovada, localiza al Tigre Guardián.";
+                textoHistoria.text = "Capítulo 2: Con energía renovada, localiza la carta del Tigre Guardián.";
                 break;
             case 2:
-                textoHistoria.text = "Capítulo 3: Encuentra la Gema Astral para activar el santuario.";
+                textoHistoria.text = "Capítulo 3: Encuentra el altar con la Gema Astral.";
                 break;
             case 3:
-                textoHistoria.text = "Capítulo 4: Vuela hacia la Isla Flotante para completar la travesía.";
+                textoHistoria.text = "Capítulo 4: Descubre la carta de la Isla Flotante para abrir el portal final.";
+                break;
+            case 4:
+                textoHistoria.text = "Aventura completada. Presiona 'Reinicio' para barajar los marcadores.";
                 break;
         }
     }
