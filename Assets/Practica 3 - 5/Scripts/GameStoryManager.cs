@@ -57,6 +57,15 @@ public class GameStoryManager : MonoBehaviour
     private bool accesorioDesbloqueado = false;
     private float ultimoTiempoClickAccesorio = 0f;
 
+    // Nombres personalizados en español en el mismo orden que la lista de accesorios
+    private readonly string[] nombresEspanolSombreros = new string[]
+    {
+        "Corona",
+        "Sombrero de copa",
+        "Explorador",
+        "Vaquero"
+    };
+
     [Header("Marcadores Físicos Secundarios (4 ImageTargets)")]
     [Tooltip("Arrastra ImageTarget, (1), (2), (3)")]
     [SerializeField] private List<Transform> targetsFisicos;
@@ -91,7 +100,6 @@ public class GameStoryManager : MonoBehaviour
     private ObserverBehaviour observerBase;
     private List<ObserverBehaviour> observersSecundarios = new List<ObserverBehaviour>();
 
-    // Misiones activas visibles en el recuadro superior
     private readonly string[] pistasMision = new string[]
     {
         "Misión: Encuentra el Manzano Sagrado y recolecta el fruto místico.",
@@ -128,7 +136,6 @@ public class GameStoryManager : MonoBehaviour
 
     void Start()
     {
-        // Conexión por seguridad (además de la que ya tienes en el Inspector)
         if (botonComenzar != null)
         {
             botonComenzar.onClick.RemoveAllListeners();
@@ -141,7 +148,6 @@ public class GameStoryManager : MonoBehaviour
             botonVolverEmpezar.onClick.AddListener(BotonReinicioPresionado);
         }
 
-        // Mostrar pantalla de inicio al abrir la aplicación
         MostrarPantallaInicio();
     }
 
@@ -173,7 +179,6 @@ public class GameStoryManager : MonoBehaviour
         accesorioDesbloqueado = false;
         indiceAccesorioActual = -1;
 
-        // 1. Restaurar al Robin al nido base
         if (robinPajaro != null)
         {
             robinPajaro.transform.SetParent(padreBase);
@@ -189,11 +194,9 @@ public class GameStoryManager : MonoBehaviour
             }
         }
 
-        // 2. Restaurar color original del ave
         if (robinRenderer != null)
             robinRenderer.material.color = colorNormalPajaro;
 
-        // 3. Restaurar manzana y gema
         if (manzanaObjeto != null)
         {
             manzanaObjeto.SetActive(true);
@@ -205,12 +208,10 @@ public class GameStoryManager : MonoBehaviour
             gemaObjeto.transform.localScale = Vector3.one;
         }
 
-        // 4. Sombreros apagados y ocultar botón accesorio
         ApagarTodosLosAccesorios();
         if (botonCambiarAccesorio != null)
             botonCambiarAccesorio.gameObject.SetActive(false);
 
-        // 5. Apagar portal de la isla
         if (luzIslaBrillo != null)
         {
             luzIslaBrillo.intensity = 0f;
@@ -224,7 +225,6 @@ public class GameStoryManager : MonoBehaviour
     {
         ResetearMundoYVariables();
 
-        // Barajar aleatoriamente los 4 dioramas entre los 4 targets
         List<int> disponibles = new List<int> { 0, 1, 2, 3 };
         for (int i = disponibles.Count - 1; i > 0; i--)
         {
@@ -243,11 +243,10 @@ public class GameStoryManager : MonoBehaviour
             if (dioramas[d] != null && targetAsignado < targetsFisicos.Count)
             {
                 dioramas[d].transform.SetParent(targetsFisicos[targetAsignado], false);
-                dioramas[d].SetActive(false); // Oculto tras el question
+                dioramas[d].SetActive(false);
             }
         }
 
-        // Encender todos los questions misteriosos
         if (questionsFisicos != null)
         {
             foreach (var q in questionsFisicos)
@@ -313,13 +312,11 @@ public class GameStoryManager : MonoBehaviour
 
         Transform targetDestino = (targetIdx == 99) ? padreBase : targetsFisicos[targetIdx];
 
-        // 1. Activar animación de vuelo
         if (robinAnimator != null)
         {
             robinAnimator.SetBool("active", true);
         }
 
-        // 2. Emparentar y volar hacia Vector3.zero
         if (robinPajaro != null && targetDestino != null)
         {
             robinPajaro.transform.SetParent(targetDestino, true);
@@ -347,13 +344,11 @@ public class GameStoryManager : MonoBehaviour
             robinPajaro.transform.localScale = escalaBaseLocal;
         }
 
-        // 3. Regresar a Idle
         if (robinAnimator != null)
         {
             robinAnimator.SetBool("active", false);
         }
 
-        // Retorno al nido base
         if (targetIdx == 99)
         {
             targetFisicoActual = 99;
@@ -364,9 +359,6 @@ public class GameStoryManager : MonoBehaviour
             yield break;
         }
 
-        // ==========================================================
-        // APAGAR QUESTION Y REVELAR DIORAMA
-        // ==========================================================
         if (questionsFisicos != null && targetIdx < questionsFisicos.Count && questionsFisicos[targetIdx] != null)
             questionsFisicos[targetIdx].SetActive(false);
 
@@ -375,9 +367,6 @@ public class GameStoryManager : MonoBehaviour
 
         targetFisicoActual = targetIdx;
 
-        // ==========================================================
-        // CASOS NARRATIVOS Y PROGRESIÓN
-        // ==========================================================
         // CASO 1: MANZANA (dioramaIdx == 0)
         if (dioramaIdx == 0)
         {
@@ -504,7 +493,7 @@ public class GameStoryManager : MonoBehaviour
                 ActualizarBarraProgresoUI(4);
 
                 ActualizarTextoNarrativaConFade("¡Has alcanzado la cumbre del Santuario del Origen!\n¡El gran portal celestial se abre en gloria!");
-                yield return new WaitForSeconds(2.5f);
+                yield return new WaitForSeconds(2.0f);
 
                 MostrarModalVictoria();
             }
@@ -540,9 +529,15 @@ public class GameStoryManager : MonoBehaviour
 
     private void MostrarModalVictoria()
     {
+        // 1. Apagar por completo el HUD del juego para que no se superponga
+        if (panelJugable != null)
+            panelJugable.SetActive(false);
+
+        // 2. Encender el panel de victoria al frente
         if (panelVictoria != null)
         {
             panelVictoria.SetActive(true);
+            panelVictoria.transform.SetAsLastSibling(); // Ponerlo hasta el frente del Canvas
         }
     }
 
@@ -607,9 +602,13 @@ public class GameStoryManager : MonoBehaviour
         int siguienteIndice = (indiceAccesorioActual + 1) % listaAccesorios.Count;
         ActivarAccesorioPorIndice(siguienteIndice);
 
-        if (textoNarrativa != null && listaAccesorios[siguienteIndice] != null)
+        if (textoNarrativa != null)
         {
-            textoNarrativa.text = $"Sombrero equipado: {listaAccesorios[siguienteIndice].name} ({siguienteIndice + 1}/{listaAccesorios.Count})";
+            string nombreLimpio = (siguienteIndice >= 0 && siguienteIndice < nombresEspanolSombreros.Length)
+                                  ? nombresEspanolSombreros[siguienteIndice]
+                                  : listaAccesorios[siguienteIndice].name;
+
+            textoNarrativa.text = $"Sombrero equipado: {nombreLimpio} ({siguienteIndice + 1}/{listaAccesorios.Count})";
         }
     }
 
