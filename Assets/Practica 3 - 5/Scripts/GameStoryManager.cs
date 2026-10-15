@@ -7,12 +7,40 @@ using Vuforia;
 
 public class GameStoryManager : MonoBehaviour
 {
-    [Header("UI & Narrativa")]
+    [Header("1. Portada / Pantalla de Inicio")]
+    [Tooltip("Arrastra Panel_Inicio")]
+    [SerializeField] private GameObject panelInicio;
+    [Tooltip("Arrastra Start (Button)")]
+    [SerializeField] private Button botonComenzar;
+
+    [Header("2. HUD Jugable (Contenedor Principal de Juego)")]
+    [Tooltip("Arrastra Panel_Jugable")]
+    [SerializeField] private GameObject panelJugable;
+
+    [Header("3. Barra de Progreso y Misión")]
+    [Tooltip("Arrastra Barra Progreso (Slider)")]
+    [SerializeField] private Slider sliderProgreso;
+    [Tooltip("Arrastra Texto_MisionActiva")]
+    [SerializeField] private TextMeshProUGUI textoMisionActiva;
+    [Tooltip("Opcional: Si tienes texto de porcentaje, sino None")]
+    [SerializeField] private TextMeshProUGUI textoPorcentaje;
+
+    [Header("4. Panel de Texto (Narrativa e Indicaciones)")]
+    [Tooltip("Arrastra TextoMision")]
     [SerializeField] private TextMeshProUGUI textoNarrativa;
-    [SerializeField] private CanvasGroup panelCanvasGroup;
+    [Tooltip("Arrastra Panel_Texto (Canvas Group)")]
+    [SerializeField] private CanvasGroup panelTextoCanvasGroup;
+
+    [Header("Botones de Control")]
     [SerializeField] private Button botonSiguiente;
     [SerializeField] private Button botonReinicio;
     [SerializeField] private Button botonCambiarAccesorio;
+
+    [Header("5. Pantalla de Victoria (WINNER)")]
+    [Tooltip("Arrastra Panel_Victoria")]
+    [SerializeField] private GameObject panelVictoria;
+    [Tooltip("Arrastra VolverEmpezar (Button)")]
+    [SerializeField] private Button botonVolverEmpezar;
 
     [Header("Protagonista")]
     [SerializeField] private GameObject robinPajaro;
@@ -20,7 +48,7 @@ public class GameStoryManager : MonoBehaviour
     [SerializeField] private Renderer robinRenderer;
     [SerializeField] private float rotacionYFinal = 90f;
     [SerializeField] private Color colorNormalPajaro = Color.white;
-    [SerializeField] private Color colorManzanaPajaro = new Color(1f, 0.85f, 0.2f); // Dorado
+    [SerializeField] private Color colorManzanaPajaro = new Color(1f, 0.82f, 0.15f); // Dorado resplandeciente
 
     [Header("Accesorios (Sombreros en Head)")]
     [Tooltip("En orden: 0: Crown, 1: TopHat, 2: mountie_hat, 3: Cowboy")]
@@ -44,7 +72,7 @@ public class GameStoryManager : MonoBehaviour
     [SerializeField] private GameObject gemaObjeto;
     [SerializeField] private Light luzIslaBrillo;
 
-    // Progreso: 0 = Manzana | 1 = Tigre | 2 = Altar | 3 = Isla | 4 = Fin
+    // Progreso: 0 = Manzana | 1 = Tigre | 2 = Altar | 3 = Isla | 4 = Victoria Total
     private int progresoHistoria = 0;
     private bool enVuelo = false;
     private int targetFisicoActual = 99; // 99 = Nido Base (ImageTarget 4)
@@ -53,22 +81,23 @@ public class GameStoryManager : MonoBehaviour
     private int[] dioramaEnTarget = new int[4];
     private int[] targetDeDiorama = new int[4];
 
-    // Respaldo nido
+    // Respaldo nido base
     private Transform padreBase;
     private Vector3 posBaseLocal;
     private Quaternion rotBaseLocal;
     private Vector3 escalaBaseLocal;
 
-    // Observers para tracking estricto
+    // Tracking estricto de Vuforia
     private ObserverBehaviour observerBase;
     private List<ObserverBehaviour> observersSecundarios = new List<ObserverBehaviour>();
 
+    // Misiones activas visibles en el recuadro superior
     private readonly string[] pistasMision = new string[]
     {
-        "Misión actual: Encuentra el Manzano Sagrado para que el ave reciba su bendición.",
-        "Misión actual: Encuentra al Guardián Silente para obtener su protección.",
-        "Misión actual: Encuentra el Altar Místico para reclamar la reliquia real.",
-        "Misión final: Encuentra la Isla del Origen para despertar el gran portal celestial."
+        "Misión: Encuentra el Manzano Sagrado y recolecta el fruto místico.",
+        "Misión: Busca al Guardián Silente y gana su bendición protectora.",
+        "Misión: Localiza el Altar Ancestral para despertar la reliquia real.",
+        "Misión Final: Descubre la Isla del Origen y enciende el gran portal celestial."
     };
 
     void Awake()
@@ -99,25 +128,52 @@ public class GameStoryManager : MonoBehaviour
 
     void Start()
     {
-        // Se desactiva el botón de accesorios al inicio hasta llegar al Altar.
-        if (botonCambiarAccesorio != null)
+        // Conexión por seguridad (además de la que ya tienes en el Inspector)
+        if (botonComenzar != null)
         {
-            botonCambiarAccesorio.gameObject.SetActive(false);
+            botonComenzar.onClick.RemoveAllListeners();
+            botonComenzar.onClick.AddListener(BotonComenzarPresionado);
         }
 
-        BarajarYReiniciar();
+        if (botonVolverEmpezar != null)
+        {
+            botonVolverEmpezar.onClick.RemoveAllListeners();
+            botonVolverEmpezar.onClick.AddListener(BotonReinicioPresionado);
+        }
+
+        // Mostrar pantalla de inicio al abrir la aplicación
+        MostrarPantallaInicio();
     }
 
-    public void BarajarYReiniciar()
+    public void MostrarPantallaInicio()
     {
         StopAllCoroutines();
         enVuelo = false;
+
+        if (panelInicio != null) panelInicio.SetActive(true);
+        if (panelJugable != null) panelJugable.SetActive(false);
+        if (panelVictoria != null) panelVictoria.SetActive(false);
+
+        ResetearMundoYVariables();
+    }
+
+    public void BotonComenzarPresionado()
+    {
+        if (panelInicio != null) panelInicio.SetActive(false);
+        if (panelVictoria != null) panelVictoria.SetActive(false);
+        if (panelJugable != null) panelJugable.SetActive(true);
+
+        BarajarYArrancarPartida();
+    }
+
+    private void ResetearMundoYVariables()
+    {
         progresoHistoria = 0;
-        targetFisicoActual = 99;
+        targetFisicoActual = 99; // Nido base
         accesorioDesbloqueado = false;
         indiceAccesorioActual = -1;
 
-        // 1. Restaurar al Robin al nido
+        // 1. Restaurar al Robin al nido base
         if (robinPajaro != null)
         {
             robinPajaro.transform.SetParent(padreBase);
@@ -133,7 +189,7 @@ public class GameStoryManager : MonoBehaviour
             }
         }
 
-        // 2. Restaurar color original
+        // 2. Restaurar color original del ave
         if (robinRenderer != null)
             robinRenderer.material.color = colorNormalPajaro;
 
@@ -143,21 +199,32 @@ public class GameStoryManager : MonoBehaviour
             manzanaObjeto.SetActive(true);
             manzanaObjeto.transform.localScale = Vector3.one;
         }
-        if (gemaObjeto != null) gemaObjeto.SetActive(true);
+        if (gemaObjeto != null)
+        {
+            gemaObjeto.SetActive(true);
+            gemaObjeto.transform.localScale = Vector3.one;
+        }
 
-        // 4. Apagar todos los sombreros y ocultar botón
+        // 4. Sombreros apagados y ocultar botón accesorio
         ApagarTodosLosAccesorios();
         if (botonCambiarAccesorio != null)
             botonCambiarAccesorio.gameObject.SetActive(false);
 
-        // 5. Apagar luz de isla
+        // 5. Apagar portal de la isla
         if (luzIslaBrillo != null)
         {
             luzIslaBrillo.intensity = 0f;
             luzIslaBrillo.enabled = false;
         }
 
-        // 6. Barajar los 4 dioramas
+        ActualizarBarraProgresoUI(0);
+    }
+
+    public void BarajarYArrancarPartida()
+    {
+        ResetearMundoYVariables();
+
+        // Barajar aleatoriamente los 4 dioramas entre los 4 targets
         List<int> disponibles = new List<int> { 0, 1, 2, 3 };
         for (int i = disponibles.Count - 1; i > 0; i--)
         {
@@ -176,18 +243,18 @@ public class GameStoryManager : MonoBehaviour
             if (dioramas[d] != null && targetAsignado < targetsFisicos.Count)
             {
                 dioramas[d].transform.SetParent(targetsFisicos[targetAsignado], false);
-                dioramas[d].SetActive(false);
+                dioramas[d].SetActive(false); // Oculto tras el question
             }
         }
 
-        // 7. Encender questions
+        // Encender todos los questions misteriosos
         if (questionsFisicos != null)
         {
             foreach (var q in questionsFisicos)
                 if (q != null) q.SetActive(true);
         }
 
-        ActualizarTextoConFade("El viaje comienza.\n" + pistasMision[0] + "\n\nEnfoca un marcador y pulsa 'Siguiente'.");
+        ActualizarTextoNarrativaConFade("El viaje comienza.\nEnfoca con la cámara un marcador misterioso y presiona el botón 'Play' para enviar al ave.");
         if (botonSiguiente != null) botonSiguiente.interactable = true;
     }
 
@@ -197,7 +264,7 @@ public class GameStoryManager : MonoBehaviour
 
         if (progresoHistoria >= 4)
         {
-            ActualizarTextoConFade("¡La historia ha finalizado! Pulsa 'Reinicio' para barajar los marcadores de nuevo.");
+            MostrarModalVictoria();
             return;
         }
 
@@ -205,7 +272,7 @@ public class GameStoryManager : MonoBehaviour
 
         if (targetVisto == -1)
         {
-            ActualizarTextoConFade("⚠️ Enfoca claramente con la cámara el marcador hacia donde deseas enviar al ave.");
+            ActualizarTextoNarrativaConFade("⚠️ Enfoca con claridad uno de los marcadores con la cámara antes de avanzar.");
             return;
         }
 
@@ -252,7 +319,7 @@ public class GameStoryManager : MonoBehaviour
             robinAnimator.SetBool("active", true);
         }
 
-        // 2. Emparentar directo al nuevo ImageTarget y viajar a (0, 0, 0)
+        // 2. Emparentar y volar hacia Vector3.zero
         if (robinPajaro != null && targetDestino != null)
         {
             robinPajaro.transform.SetParent(targetDestino, true);
@@ -286,11 +353,11 @@ public class GameStoryManager : MonoBehaviour
             robinAnimator.SetBool("active", false);
         }
 
-        // Caso: Regreso al nido base
+        // Retorno al nido base
         if (targetIdx == 99)
         {
             targetFisicoActual = 99;
-            ActualizarTextoConFade("El ave ha regresado a descansar a su nido base.\n\n" + pistasMision[progresoHistoria]);
+            ActualizarTextoNarrativaConFade("El ave regresa a descansar a su nido de origen.");
             yield return new WaitForSeconds(2.0f);
             if (botonSiguiente != null && progresoHistoria < 4) botonSiguiente.interactable = true;
             enVuelo = false;
@@ -298,7 +365,7 @@ public class GameStoryManager : MonoBehaviour
         }
 
         // ==========================================================
-        // APAGAR QUESTION Y ACTIVAR ESCENA
+        // APAGAR QUESTION Y REVELAR DIORAMA
         // ==========================================================
         if (questionsFisicos != null && targetIdx < questionsFisicos.Count && questionsFisicos[targetIdx] != null)
             questionsFisicos[targetIdx].SetActive(false);
@@ -309,20 +376,19 @@ public class GameStoryManager : MonoBehaviour
         targetFisicoActual = targetIdx;
 
         // ==========================================================
-        // CASOS NARRATIVOS Y ACCIONES
+        // CASOS NARRATIVOS Y PROGRESIÓN
         // ==========================================================
         // CASO 1: MANZANA (dioramaIdx == 0)
         if (dioramaIdx == 0)
         {
             if (progresoHistoria == 0)
             {
-                ActualizarTextoConFade("¡El ave encuentra el Manzano Sagrado!\nObserva el fruto místico...");
-
-                yield return new WaitForSeconds(1.8f);
+                ActualizarTextoNarrativaConFade("¡Has hallado el Manzano Sagrado!\nObserva el fruto reluciente...");
+                yield return new WaitForSeconds(2.0f);
 
                 if (robinAnimator != null) robinAnimator.SetTrigger("comer");
-
                 yield return new WaitForSeconds(1.2f);
+
                 if (manzanaObjeto != null)
                 {
                     Vector3 escalaIni = manzanaObjeto.transform.localScale;
@@ -337,15 +403,16 @@ public class GameStoryManager : MonoBehaviour
                 }
 
                 StartCoroutine(EfectoColor(colorManzanaPajaro));
-                ActualizarTextoConFade("¡El ave ha comido la manzana!\nSus plumas se impregnan del poder místico y resplandecen en oro.");
+                ActualizarTextoNarrativaConFade("¡El ave consume el fruto sagrado!\nSus plumas se impregnan de energía y resplandecen en oro puro.");
                 yield return new WaitForSeconds(3.0f);
 
                 progresoHistoria = 1;
-                ActualizarTextoConFade("Paso completado.\n" + pistasMision[1]);
+                ActualizarBarraProgresoUI(1);
+                ActualizarTextoNarrativaConFade("¡Paso completado!\nEnfoca otro marcador misterioso para buscar al Guardián.");
             }
             else
             {
-                ActualizarTextoConFade("Has vuelto al Manzano, pero el ave ya posee la bendición dorada.\n\n" + pistasMision[progresoHistoria]);
+                ActualizarTextoNarrativaConFade("El Manzano Sagrado florece en paz. El ave ya posee la bendición dorada.");
             }
         }
         // CASO 2: TIGRE (dioramaIdx == 1)
@@ -353,19 +420,20 @@ public class GameStoryManager : MonoBehaviour
         {
             if (progresoHistoria == 0)
             {
-                ActualizarTextoConFade("¡Descubriste al Guardián Silente!\nSin embargo, el felino no percibe el poder místico en el ave.\n\n" + pistasMision[0]);
+                ActualizarTextoNarrativaConFade("¡Has encontrado al Guardián Silente!\nSin embargo, la fiera no detecta poder místico en el ave. Busca primero el Manzano.");
             }
             else if (progresoHistoria == 1)
             {
-                ActualizarTextoConFade("¡El Guardián contempla las plumas doradas!\nEl noble tigre inclina su mirada y le concede paso libre.");
-                yield return new WaitForSeconds(3.0f);
+                ActualizarTextoNarrativaConFade("¡El Guardián contempla las plumas doradas!\nEl noble felino reconoce tu valía y te concede el paso libre.");
+                yield return new WaitForSeconds(3.5f);
 
                 progresoHistoria = 2;
-                ActualizarTextoConFade("Paso completado.\n" + pistasMision[2]);
+                ActualizarBarraProgresoUI(2);
+                ActualizarTextoNarrativaConFade("¡Paso completado!\nEnfoca otro marcador misterioso en busca del Altar Ancestral.");
             }
             else
             {
-                ActualizarTextoConFade("El Guardián reposa tranquilo.\n\n" + pistasMision[progresoHistoria]);
+                ActualizarTextoNarrativaConFade("El Guardián Silente reposa satisfecho tras otorgar su bendición.");
             }
         }
         // CASO 3: ALTAR (dioramaIdx == 2)
@@ -373,31 +441,46 @@ public class GameStoryManager : MonoBehaviour
         {
             if (progresoHistoria == 0)
             {
-                ActualizarTextoConFade("Llegaste al Altar Ancestral, pero la reliquia está dormida.\nEl ave aún no tiene el sustento sagrado.\n\n" + pistasMision[0]);
+                ActualizarTextoNarrativaConFade("Llegas al Altar Ancestral, pero está inerte. El explorador aún no ha comido el fruto sagrado.");
             }
             else if (progresoHistoria == 1)
             {
-                ActualizarTextoConFade("El Altar Ancestral vibra débilmente, pero rechaza la presencia del ave.\nNecesitas la bendición del Guardián primero.\n\n" + pistasMision[1]);
+                ActualizarTextoNarrativaConFade("La piedra vibra tímidamente, pero la reliquia permanece sellada. Te falta la aprobación del Guardián.");
             }
             else if (progresoHistoria == 2)
             {
-                accesorioDesbloqueado = true;
-                ActivarAccesorioPorIndice(0); // 0: Crown
+                ActualizarTextoNarrativaConFade("¡El Altar Ancestral responde a la bendición del Guardián!\nLa gema sagrada resuena intensamente...");
+                yield return new WaitForSeconds(2.5f);
 
-                if (gemaObjeto != null) gemaObjeto.SetActive(false);
+                if (gemaObjeto != null)
+                {
+                    Vector3 escalaIniGema = gemaObjeto.transform.localScale;
+                    float elapsed = 0f;
+                    while (elapsed < 1f)
+                    {
+                        elapsed += Time.deltaTime * 1.5f;
+                        gemaObjeto.transform.localScale = Vector3.Lerp(escalaIniGema, Vector3.zero, elapsed);
+                        yield return null;
+                    }
+                    gemaObjeto.SetActive(false);
+                }
+
+                accesorioDesbloqueado = true;
+                ActivarAccesorioPorIndice(0); // Corona
 
                 if (botonCambiarAccesorio != null)
                     botonCambiarAccesorio.gameObject.SetActive(true);
 
-                ActualizarTextoConFade("¡El Altar Ancestral despierta!\nLa reliquia corona solemnemente al ave como explorador real.");
+                ActualizarTextoNarrativaConFade("¡La energía de la reliquia corona solemnemente al ave como Monarca del Vuelo!");
                 yield return new WaitForSeconds(3.5f);
 
                 progresoHistoria = 3;
-                ActualizarTextoConFade("Paso completado. (¡Usa el botón inferior para probar sombreros!)\n\n" + pistasMision[3]);
+                ActualizarBarraProgresoUI(3);
+                ActualizarTextoNarrativaConFade("¡Reliquia obtenida!\n(¡Ahora puedes probar los sombreros con el botón de doble flecha!)\nBusca el marcador de la Isla final.");
             }
             else
             {
-                ActualizarTextoConFade("El Altar ya otorgó su corona.\n\n" + pistasMision[progresoHistoria]);
+                ActualizarTextoNarrativaConFade("El Altar ya otorgó su reliquia a la corona del explorador.");
             }
         }
         // CASO 4: ISLA (dioramaIdx == 3)
@@ -405,20 +488,25 @@ public class GameStoryManager : MonoBehaviour
         {
             if (progresoHistoria < 3)
             {
-                ActualizarTextoConFade("Divisas la Isla del Origen, pero el gran portal está inerte.\nDebes reunir las tres bendiciones previas.\n\n" + pistasMision[progresoHistoria]);
+                ActualizarTextoNarrativaConFade("Divisas el Santuario del Origen, pero las puertas místicas exigen reunir todas las bendiciones previas.");
             }
             else if (progresoHistoria == 3)
             {
                 if (luzIslaBrillo != null)
                 {
                     luzIslaBrillo.enabled = true;
-                    luzIslaBrillo.color = new Color(0.4f, 0.9f, 1f);
-                    luzIslaBrillo.range = 8.0f;
-                    StartCoroutine(EfectoBrilloPortal(7.0f));
+                    luzIslaBrillo.color = new Color(1f, 0.78f, 0.25f);
+                    luzIslaBrillo.range = 20.0f;
+                    StartCoroutine(EfectoBrilloPortal(15.0f));
                 }
 
-                ActualizarTextoConFade("¡Has alcanzado la cima de la Isla del Origen!\nCon el oro, la bendición y la corona, el gran portal resplandece en gloria.\n\n¡La aventura ha culminado con éxito total!");
                 progresoHistoria = 4;
+                ActualizarBarraProgresoUI(4);
+
+                ActualizarTextoNarrativaConFade("¡Has alcanzado la cumbre del Santuario del Origen!\n¡El gran portal celestial se abre en gloria!");
+                yield return new WaitForSeconds(2.5f);
+
+                MostrarModalVictoria();
             }
         }
 
@@ -426,6 +514,36 @@ public class GameStoryManager : MonoBehaviour
             botonSiguiente.interactable = true;
 
         enVuelo = false;
+    }
+
+    private void ActualizarBarraProgresoUI(int paso)
+    {
+        float ratio = Mathf.Clamp01((float)paso / 4f);
+
+        if (sliderProgreso != null)
+        {
+            sliderProgreso.minValue = 0f;
+            sliderProgreso.maxValue = 1f;
+            sliderProgreso.value = ratio;
+        }
+
+        if (textoPorcentaje != null)
+        {
+            textoPorcentaje.text = $"{Mathf.RoundToInt(ratio * 100)}%";
+        }
+
+        if (textoMisionActiva != null && paso >= 0 && paso < pistasMision.Length)
+        {
+            textoMisionActiva.text = pistasMision[paso];
+        }
+    }
+
+    private void MostrarModalVictoria()
+    {
+        if (panelVictoria != null)
+        {
+            panelVictoria.SetActive(true);
+        }
     }
 
     private IEnumerator EfectoColor(Color objetivo)
@@ -446,13 +564,16 @@ public class GameStoryManager : MonoBehaviour
         float t = 0f;
         while (t < 1f)
         {
-            t += Time.deltaTime * 1.5f;
+            t += Time.deltaTime * 1.2f;
             luzIslaBrillo.intensity = Mathf.Lerp(0f, intensidadFinal, t);
             yield return null;
         }
         luzIslaBrillo.intensity = intensidadFinal;
     }
 
+    // ==============================================================
+    // GESTIÓN ESTRICTA DE SOMBREROS
+    // ==============================================================
     private void ApagarTodosLosAccesorios()
     {
         if (listaAccesorios == null) return;
@@ -480,7 +601,6 @@ public class GameStoryManager : MonoBehaviour
     {
         if (!accesorioDesbloqueado || listaAccesorios == null || listaAccesorios.Count == 0) return;
 
-        // Candado de 0.25s para prevenir dobles clics en pantallas táctiles
         if (Time.time - ultimoTiempoClickAccesorio < 0.25f) return;
         ultimoTiempoClickAccesorio = Time.time;
 
@@ -495,12 +615,12 @@ public class GameStoryManager : MonoBehaviour
 
     public void BotonReinicioPresionado()
     {
-        BarajarYReiniciar();
+        MostrarPantallaInicio();
     }
 
-    private void ActualizarTextoConFade(string nuevoTexto)
+    private void ActualizarTextoNarrativaConFade(string nuevoTexto)
     {
-        if (panelCanvasGroup != null)
+        if (panelTextoCanvasGroup != null)
             StartCoroutine(RutinaFade(nuevoTexto));
         else if (textoNarrativa != null)
             textoNarrativa.text = nuevoTexto;
@@ -510,16 +630,16 @@ public class GameStoryManager : MonoBehaviour
     {
         for (float a = 1f; a >= 0f; a -= Time.deltaTime * 4f)
         {
-            panelCanvasGroup.alpha = a;
+            panelTextoCanvasGroup.alpha = a;
             yield return null;
         }
-        panelCanvasGroup.alpha = 0f;
+        panelTextoCanvasGroup.alpha = 0f;
         textoNarrativa.text = nuevoTexto;
         for (float a = 0f; a <= 1f; a += Time.deltaTime * 4f)
         {
-            panelCanvasGroup.alpha = a;
+            panelTextoCanvasGroup.alpha = a;
             yield return null;
         }
-        panelCanvasGroup.alpha = 1f;
+        panelTextoCanvasGroup.alpha = 1f;
     }
 }
